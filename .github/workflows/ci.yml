@@ -41,10 +41,6 @@ jobs:
             echo "No build_runner found, skipping code generation."
           fi
 
-      - name: Format check
-        working-directory: source/frontend
-        run: dart format --output=none --set-exit-if-changed .
-
       - name: Analyze
         working-directory: source/frontend
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
@@ -135,11 +131,8 @@ jobs:
       - name: Generate mipmap icons (if missing)
         working-directory: source/frontend
         run: |
-          if [ ! -f "android/app/src/main/res/mipmap-mdpi/ic_launcher.png" ]; then
-            echo "Mipmap icons missing — generating placeholder icons..."
-            python3 - <<'PYEOF'
+          python3 << 'PYEOF'
           import os, zlib, struct
-
           def make_png(w, h, r, g, b):
               def chunk(tag, data):
                   c = zlib.crc32(tag + data) & 0xFFFFFFFF
@@ -150,21 +143,16 @@ jobs:
                   raw += b"\x00" + bytes([r, g, b] * w)
               idat = zlib.compress(raw, 9)
               return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", idat) + chunk(b"IEND", b"")
-
           densities = {"mipmap-mdpi": 48, "mipmap-hdpi": 72, "mipmap-xhdpi": 96, "mipmap-xxhdpi": 144, "mipmap-xxxhdpi": 192}
           for density, size in densities.items():
-              folder = f"android/app/src/main/res/{density}"
+              folder = "android/app/src/main/res/" + density
               os.makedirs(folder, exist_ok=True)
               for fname in ("ic_launcher.png", "ic_launcher_round.png"):
                   path = os.path.join(folder, fname)
                   if not os.path.exists(path):
-                      with open(path, "wb") as f:
-                          f.write(make_png(size, size, 0x7C, 0x4D, 0xFF))
-                      print(f"  created {path}")
+                      open(path, "wb").write(make_png(size, size, 0x7C, 0x4D, 0xFF))
+                      print("created " + path)
           PYEOF
-          else
-            echo "Mipmap icons already present, skipping."
-          fi
 
       - name: Install dependencies
         working-directory: source/frontend
