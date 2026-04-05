@@ -1,0 +1,114 @@
+# android/fastlane/Fastfile — KriptoPilot
+#
+# Lanes:
+#   fastlane beta     → Play Store internal track (draft)
+#   fastlane release  → Play Store production (10% rollout)
+#   fastlane promote from:internal to:alpha  → promote between tracks
+#
+# Required ENV vars (set in GitHub Actions secrets):
+#   KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+#   DART_DEFINE_SUPABASE_URL, DART_DEFINE_SUPABASE_ANON_KEY
+#   APP_VERSION, BUILD_NUMBER
+#   SLACK_WEBHOOK_URL (optional)
+#
+# Note: No RevenueCat (free app). Binance API keys are stored in
+# flutter_secure_storage at runtime — never passed as dart-defines.
+
+# frozen_string_literal: true
+
+default_platform :android
+
+PACKAGE_NAME = "com.kriptopilot.app"
+PROJECT_ROOT = File.expand_path("../../", __dir__)
+FLUTTER_BIN  = "flutter"
+
+def dart_define_args
+  {
+    "APP_ENV"           => ENV["DART_DEFINE_APP_ENV"] || "prod",
+    "SUPABASE_URL"      => ENV["DART_DEFINE_SUPABASE_URL"],
+    "SUPABASE_ANON_KEY" => ENV["DART_DEFINE_SUPABASE_ANON_KEY"],
+  }.compact.map { |k, v| "--dart-define=#{k}=#{v}" }.join(" ")
+end
+
+platform :android do
+  # ── test ──────────────────────────────────────────────────────────────────────
+  desc "Run Flutter tests"
+  lane :test do
+    Dir.chdir(PROJECT_ROOT) { sh "flutter test --coverage" }
+  end
+
+  # ── beta — Play Internal track ────────────────────────────────────────────────
+  desc "Build AAB and upload to Play Store internal track"
+  lane :beta do
+    version   = ENV["APP_VERSION"] || "1.0.0"
+    build_num = ENV["BUILD_NUMBER"] || Time.now.utc.strftime("%Y%m%d%H%M")
+
+    Dir.chdir(PROJECT_ROOT) do
+      sh "#{FLUTTER_BIN} pub get"
+      sh "#{FLUTTER_BIN} build appbundle --release " \
+         "--build-name=#{version} --build-number=#{build_num} #{dart_define_args}"
+    end
+
+    upload_to_play_store(
+      package_name:            PACKAGE_NAME,
+      track:                   "internal",
+      aab:                     "#{PROJECT_ROOT}/build/app/outputs/bundle/release/app-release.aab",
+      json_key:                "fastlane/keys/play_store_key.json",
+      skip_upload_apk:         true,
+      skip_upload_metadata:    true,
+      skip_upload_changelogs:  true,
+      skip_upload_images:      true,
+      skip_upload_screenshots: true,
+      release_status:          "draft",
+    )
+
+    slack_notify("KriptoPilot Android staging AAB uploaded to Play Internal ✅") if ENV["SLACK_WEBHOOK_URL"]
+  end
+
+  # ── release — Play Store production ──────────────────────────────────────────
+  desc "Build AAB and submit to Play Store production (10% rollout)"
+  lane :release do
+    version   = ENV["APP_VERSION"]
+    build_num = ENV["BUILD_NUMBER"]
+
+    UI.user_error!("APP_VERSION is required") unless version
+    UI.user_error!("BUILD_NUMBER is required") unless build_num
+
+    Dir.chdir(PROJECT_ROOT) do
+      sh "#{FLUTTER_BIN} pub get"
+      sh "#{FLUTTER_BIN} build appbundle --release " \
+         "--build-name=#{version} --build-number=#{build_num} #{dart_define_args}"
+    end
+
+    upload_to_play_store(
+      package_name:            PACKAGE_NAME,
+      track:                   "production",
+      rollout:                 "0.1",
+      aab:                     "#{PROJECT_ROOT}/build/app/outputs/bundle/release/app-release.aab",
+      json_key:                "fastlane/keys/play_store_key.json",
+      skip_upload_apk:         true,
+      skip_upload_metadata:    false,
+      release_status:          "inProgress",
+    )
+
+    slack_notify("KriptoPilot Android #{version} submitted to Play Store (10% rollout) 🚀") if ENV["SLACK_WEBHOOK_URL"]
+  end
+
+  # ── promote — between tracks ──────────────────────────────────────────────────
+  desc "Promote a build between Play Store tracks"
+  lane :promote do |options|
+    upload_to_play_store(
+      package_name:         PACKAGE_NAME,
+      track:                options[:from] || "internal",
+      track_promote_to:     options[:to]   || "alpha",
+      json_key:             "fastlane/keys/play_store_key.json",
+      skip_upload_apk:      true,
+      skip_upload_aab:      true,
+      skip_upload_metadata: true,
+    )
+  end
+
+  private_lane :slack_notify do |message|
+    slack(message: message, webhook_url: ENV.fetch("SLACK_WEBHOOK_URL", ""), success: true)
+  end
+end

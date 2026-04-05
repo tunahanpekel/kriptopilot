@@ -1,0 +1,18 @@
+# android/key.properties.example
+#
+# Copy this file to key.properties and fill in the real values.
+# NEVER commit key.properties to version control.
+# Add `android/key.properties` to your .gitignore.
+#
+# To generate a keystore:
+#   keytool -genkey -v -keystore release.jks \
+#     -alias kriptopilot -keyalg RSA -keysize 2048 -validity 10000
+#
+# To base64-encode the keystore for the CI secret ANDROID_KEYSTORE_BASE64:
+#   base64 -i release.jks | pbcopy   # macOS
+#   base64 release.jks | xclip       # Linux
+
+storePassword=YOUR_KEYSTORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=kriptopilot
+storeFile=release.jks
