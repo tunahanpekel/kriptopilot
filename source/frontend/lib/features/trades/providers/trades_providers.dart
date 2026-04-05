@@ -14,7 +14,7 @@ final tradesProvider = FutureProvider.family<List<TradeModel>, String>((ref, fil
       .from('trades')
       .select()
       .eq('user_id', userId)
-      .is_('deleted_at', null);
+      .isFilter('deleted_at', null);
 
   switch (filter) {
     case 'buy':
