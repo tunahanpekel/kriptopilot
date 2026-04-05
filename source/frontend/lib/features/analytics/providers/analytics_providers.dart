@@ -45,7 +45,7 @@ final analyticsStatsProvider = FutureProvider<AnalyticsStats>((ref) async {
       .select('realized_pnl, claude_confidence')
       .eq('user_id', userId)
       .eq('status', 'closed')
-      .is_('deleted_at', null);
+      .isFilter('deleted_at', null);
 
   if (rows.isEmpty) {
     return const AnalyticsStats(
@@ -82,7 +82,7 @@ final analyticsStatsProvider = FutureProvider<AnalyticsStats>((ref) async {
     losses: losses,
     winRate: total > 0 ? (wins / total) * 100 : 0,
     totalPnl: totalPnl,
-    bestTrade: bestTrade.isNegativeInfinity ? 0 : bestTrade,
+    bestTrade: (bestTrade.isInfinite && bestTrade.isNegative) ? 0 : bestTrade,
     worstTrade: worstTrade.isInfinite ? 0 : worstTrade,
     avgConfidence: total > 0 ? totalConfidence / total : 0,
   );
