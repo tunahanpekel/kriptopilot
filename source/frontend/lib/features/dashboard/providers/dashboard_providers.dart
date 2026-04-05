@@ -85,8 +85,10 @@ final openPositionsProvider = StreamProvider<List<PositionModel>>((ref) {
       .from('positions')
       .stream(primaryKey: ['id'])
       .eq('user_id', userId)
-      .eq('status', 'open')
-      .map((rows) => rows.map(PositionModel.fromJson).toList());
+      .map((rows) => rows
+          .where((r) => r['status'] == 'open')
+          .map(PositionModel.fromJson)
+          .toList());
 });
 
 // ─── Recent Trades Provider ───────────────────────────────────────────────────
@@ -99,7 +101,7 @@ final recentTradesProvider = FutureProvider<List<TradeModel>>((ref) async {
       .from('trades')
       .select()
       .eq('user_id', userId)
-      .is_('deleted_at', null)
+      .isFilter('deleted_at', null)
       .order('opened_at', ascending: false)
       .limit(3);
 
